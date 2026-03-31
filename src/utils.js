@@ -1,5 +1,5 @@
 /**
- * Truncate string to maxLen, adding "..." if truncated
+ * Cắt chuỗi theo độ dài tối đa, thêm "..." nếu bị cắt
  */
 function truncate(str, maxLen = 4000) {
     if (!str) return '';
