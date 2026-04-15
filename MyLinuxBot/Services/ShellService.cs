@@ -19,7 +19,7 @@ public class ShellService(ILogger<ShellService> logger) : IShellService
                  cmd = cmd.WithWorkingDirectory(workingDirectory);
              }
 
-             using var cts = new CancellationTokenSource(timeout ?? TimeSpan.FromMinutes(2));
+             using var cts = new CancellationTokenSource(timeout ?? TimeSpan.FromSeconds(30));
              using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, cts.Token);
 
              var result = await cmd.ExecuteBufferedAsync(linkedCts.Token);

@@ -39,32 +39,48 @@ public class BotUpdateHandler(
             return;
         }
 
-        if (message.Text is not null && message.Text.StartsWith('/'))
+        if (message.Text is not null)
         {
-            var parts = message.Text.Split(' ', 2);
-            var commandName = parts[0].ToLowerInvariant(); // e.g., /shell
-            
-            using var scope = serviceProvider.CreateScope();
-            var commands = scope.ServiceProvider.GetServices<ITelegramCommand>();
-            var targetCommand = commands.FirstOrDefault(c => c.CommandName == commandName);
+            if (message.Text.StartsWith('/'))
+            {
+                var parts = message.Text.Split(' ', 2);
+                var commandName = parts[0].ToLowerInvariant(); // e.g., /shell
+                
+                using var cmdScope = serviceProvider.CreateScope();
+                var commands = cmdScope.ServiceProvider.GetServices<ITelegramCommand>();
+                var targetCommand = commands.FirstOrDefault(c => c.CommandName == commandName);
 
-            if (targetCommand != null)
-            {
-                try
+                if (targetCommand != null)
                 {
-                    logger.LogInformation("Executing command: {CommandName}", commandName);
-                    await targetCommand.ExecuteAsync(botClient, message, cancellationToken);
+                    try
+                    {
+                        logger.LogInformation("Executing command: {CommandName}", commandName);
+                        await targetCommand.ExecuteAsync(botClient, message, cancellationToken);
+                        return;
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "Error executing command {CommandName}", commandName);
+                        await botClient.SendMessage(message.Chat.Id, "An error occurred.", cancellationToken: cancellationToken);
+                        return;
+                    }
                 }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex, "Error executing command {CommandName}", commandName);
-                    await botClient.SendMessage(message.Chat.Id, "An error occurred.", cancellationToken: cancellationToken);
-                }
+                // Fall through for unknown command to n8n AI
             }
-            else
-            {
-                await botClient.SendMessage(message.Chat.Id, $"Unknown command: {commandName}", cancellationToken: cancellationToken);
-            }
+            
+            // Forward plain message or unknown command to n8n AI
+            using var scope = serviceProvider.CreateScope();
+            var n8nService = scope.ServiceProvider.GetRequiredService<IN8nIntegrationService>();
+            
+            var typingMsg = await botClient.SendMessage(message.Chat.Id, "Thinking...", cancellationToken: cancellationToken);
+            
+            var n8nResponse = await n8nService.ForwardMessageAsync(message.Text, cancellationToken);
+            
+            if (n8nResponse.Length > 4000)
+                n8nResponse = n8nResponse[..4000] + "\n...[truncated]";
+                
+            var safeResponse = System.Net.WebUtility.HtmlEncode(n8nResponse);
+            await botClient.EditMessageText(message.Chat.Id, typingMsg.MessageId, $"<pre>{safeResponse}</pre>", parseMode: ParseMode.Html, cancellationToken: cancellationToken);
         }
         else if (message.Type == MessageType.Document)
         {

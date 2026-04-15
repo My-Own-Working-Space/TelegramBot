@@ -35,6 +35,7 @@ builder.Services.AddHostedService<BotHostedService>();
 // 3. Register Domain Services
 builder.Services.AddSingleton<IShellService, ShellService>();
 builder.Services.AddSingleton<IGeminiService, GeminiService>();
+builder.Services.AddHttpClient<IN8nIntegrationService, N8nIntegrationService>();
 
 // 4. Register Commands (Command Pattern)
 builder.Services.AddTransient<ITelegramCommand, ShellCommand>();
@@ -72,4 +73,33 @@ app.MapPost("/webhook/n8n", async (ILogger<Program> logger, IConfiguration confi
     return Results.Ok(new { success = true });
 });
 
+// 6. API Endpoint for n8n Agent Actions
+app.MapPost("/api/execute", async (HttpContext context, IConfiguration config, IShellService shellService) =>
+{
+    var apiKey = config["N8N_API_KEY"];
+    if (!context.Request.Headers.TryGetValue("X-API-Key", out var extractedApiKey) || extractedApiKey != apiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    using var streamReader = new StreamReader(context.Request.Body);
+    var body = await streamReader.ReadToEndAsync();
+    var payload = System.Text.Json.JsonSerializer.Deserialize<ExecutePayload>(body, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+    if (payload == null || string.IsNullOrWhiteSpace(payload.Command))
+    {
+        return Results.BadRequest(new { error = "Command payload is missing or invalid." });
+    }
+
+    string? workingDirectory = payload.Type?.ToLower() == "k8s" 
+        ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Documents/Documents/K8s/Setup") 
+        : null;
+
+    var result = await shellService.ExecuteCommandAsync(payload.Command, workingDirectory);
+
+    return Results.Ok(new { success = true, output = result });
+});
+
 app.Run();
+
+public class ExecutePayload { public string? Command { get; set; } public string? Type { get; set; } }
