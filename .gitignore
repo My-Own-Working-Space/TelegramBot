@@ -1,0 +1,17 @@
+node_modules/
+.env
+user_data/
+*.png
+*.log
+
+# .NET Core
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+.idea/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.db
