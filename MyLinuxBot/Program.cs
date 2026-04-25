@@ -34,7 +34,7 @@ builder.Services.AddHostedService<BotHostedService>();
 
 // 3. Register Domain Services
 builder.Services.AddSingleton<IShellService, ShellService>();
-builder.Services.AddSingleton<IGeminiService, GeminiService>();
+builder.Services.AddHttpClient<IGeminiService, GeminiService>();
 builder.Services.AddHttpClient<IN8nIntegrationService, N8nIntegrationService>();
 
 // 4. Register Commands (Command Pattern)
@@ -62,7 +62,7 @@ app.MapPost("/webhook/n8n", async (ILogger<Program> logger, IConfiguration confi
     {
         try
         {
-            await bot.SendMessage(allowedChatId, "🔔 Alert: Webhook received from n8n!");
+            await bot.SendMessage(allowedChatId, "Alert: Webhook received from n8n!");
         }
         catch (Exception ex)
         {

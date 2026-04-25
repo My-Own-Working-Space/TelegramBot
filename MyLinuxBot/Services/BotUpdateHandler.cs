@@ -68,19 +68,18 @@ public class BotUpdateHandler(
                 // Fall through for unknown command to n8n AI
             }
             
-            // Forward plain message or unknown command to n8n AI
+            // Forward plain message to Gemini (our new primary brain)
             using var scope = serviceProvider.CreateScope();
-            var n8nService = scope.ServiceProvider.GetRequiredService<IN8nIntegrationService>();
+            var geminiService = scope.ServiceProvider.GetRequiredService<IGeminiService>();
             
             var typingMsg = await botClient.SendMessage(message.Chat.Id, "Thinking...", cancellationToken: cancellationToken);
             
-            var n8nResponse = await n8nService.ForwardMessageAsync(message.Text, cancellationToken);
+            var response = await geminiService.AskAsync(message.Text, cancellationToken);
             
-            if (n8nResponse.Length > 4000)
-                n8nResponse = n8nResponse[..4000] + "\n...[truncated]";
+            if (response.Length > 4000)
+                response = response[..4000] + "\n...[truncated]";
                 
-            var safeResponse = System.Net.WebUtility.HtmlEncode(n8nResponse);
-            await botClient.EditMessageText(message.Chat.Id, typingMsg.MessageId, $"<pre>{safeResponse}</pre>", parseMode: ParseMode.Html, cancellationToken: cancellationToken);
+            await botClient.EditMessageText(message.Chat.Id, typingMsg.MessageId, response, parseMode: ParseMode.Markdown, cancellationToken: cancellationToken);
         }
         else if (message.Type == MessageType.Document)
         {
