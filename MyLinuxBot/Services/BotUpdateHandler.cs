@@ -4,6 +4,9 @@ using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using MyLinuxBot.Interfaces;
+using MyLinuxBot.Data;
+using MyLinuxBot.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace MyLinuxBot.Services;
 
@@ -68,18 +71,35 @@ public class BotUpdateHandler(
                 // Fall through for unknown command to n8n AI
             }
             
-            // Forward plain message to Gemini (our new primary brain)
+            // Fetch history for Stateful Memory
             using var scope = serviceProvider.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<BotDbContext>();
             var geminiService = scope.ServiceProvider.GetRequiredService<IGeminiService>();
             
-            var typingMsg = await botClient.SendMessage(message.Chat.Id, "Thinking...", cancellationToken: cancellationToken);
+            var history = await dbContext.ChatMessages
+                            .Where(m => m.ChatId == message.Chat.Id)
+                            .OrderBy(m => m.Id) // Ensure chronological order
+                            .TakeLast(10)
+                            .ToListAsync(cancellationToken);
+                            
+            // Save user message to memory
+            var userMsg = new ChatMessage { ChatId = message.Chat.Id, Role = "user", Content = message.Text };
+            dbContext.ChatMessages.Add(userMsg);
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            var typingMsg = await botClient.SendMessage(message.Chat.Id, "Thinking & Analyzing...", cancellationToken: cancellationToken);
             
-            var response = await geminiService.AskAsync(message.Text, cancellationToken);
+            var response = await geminiService.AskWithHistoryAsync(history, message.Text, cancellationToken);
+            
+            // Save assistant response to memory
+            var modelMsg = new ChatMessage { ChatId = message.Chat.Id, Role = "model", Content = response };
+            dbContext.ChatMessages.Add(modelMsg);
+            await dbContext.SaveChangesAsync(cancellationToken);
             
             if (response.Length > 4000)
                 response = response[..4000] + "\n...[truncated]";
                 
-            await botClient.EditMessageText(message.Chat.Id, typingMsg.MessageId, response, parseMode: ParseMode.Markdown, cancellationToken: cancellationToken);
+            await botClient.EditMessageText(message.Chat.Id, typingMsg.MessageId, response, parseMode: ParseMode.None, cancellationToken: cancellationToken);
         }
         else if (message.Type == MessageType.Document)
         {
