@@ -20,7 +20,7 @@ if (string.IsNullOrWhiteSpace(botToken) || botToken == "your_bot_token_here")
 }
 
 // 1. Register Database (SQLite)
-builder.Services.AddDbContext<BotDbContext>(options =>
+builder.Services.AddDbContextFactory<BotDbContext>(options =>
 {
     // Use a local SQLite database
     options.UseSqlite($"Data Source=MyLinuxBot.db");
@@ -35,7 +35,7 @@ builder.Services.AddHostedService<BotHostedService>();
 // 3. Register Domain Services
 builder.Services.AddSingleton<IShellService, ShellService>();
 builder.Services.AddSingleton<IAiToolboxService, AiToolboxService>();
-builder.Services.AddHttpClient<IGeminiService, GeminiService>();
+builder.Services.AddSingleton<IGeminiService, GeminiService>();
 builder.Services.AddHttpClient<IN8nIntegrationService, N8nIntegrationService>();
 
 // 4. Register Commands (Command Pattern)

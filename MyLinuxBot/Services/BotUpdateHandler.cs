@@ -13,7 +13,8 @@ namespace MyLinuxBot.Services;
 public class BotUpdateHandler(
     ILogger<BotUpdateHandler> logger, 
     IConfiguration config,
-    IServiceProvider serviceProvider) : IUpdateHandler
+    IDbContextFactory<BotDbContext> dbContextFactory,
+    IServiceScopeFactory scopeFactory) : IUpdateHandler
 {
     private readonly long _allowedChatId = config.GetValue<long>("ALLOWED_CHAT_ID");
 
@@ -49,7 +50,7 @@ public class BotUpdateHandler(
                 var parts = message.Text.Split(' ', 2);
                 var commandName = parts[0].ToLowerInvariant(); // e.g., /shell
                 
-                using var cmdScope = serviceProvider.CreateScope();
+                using var cmdScope = scopeFactory.CreateScope();
                 var commands = cmdScope.ServiceProvider.GetServices<ITelegramCommand>();
                 var targetCommand = commands.FirstOrDefault(c => c.CommandName == commandName);
 
@@ -72,15 +73,17 @@ public class BotUpdateHandler(
             }
             
             // Fetch history for Stateful Memory
-            using var scope = serviceProvider.CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<BotDbContext>();
+            using var scope = scopeFactory.CreateScope();
+            using var dbContext = dbContextFactory.CreateDbContext();
             var geminiService = scope.ServiceProvider.GetRequiredService<IGeminiService>();
             
             var history = await dbContext.ChatMessages
                             .Where(m => m.ChatId == message.Chat.Id)
-                            .OrderBy(m => m.Id) // Ensure chronological order
-                            .TakeLast(10)
+                            .OrderByDescending(m => m.Id)
+                            .Take(10)
                             .ToListAsync(cancellationToken);
+            history.Reverse(); // Restore chronological order
+
                             
             // Save user message to memory
             var userMsg = new ChatMessage { ChatId = message.Chat.Id, Role = "user", Content = message.Text };
@@ -103,7 +106,7 @@ public class BotUpdateHandler(
         }
         else if (message.Type == MessageType.Document)
         {
-            using var scope = serviceProvider.CreateScope();
+            using var scope = scopeFactory.CreateScope();
             var commands = scope.ServiceProvider.GetServices<ITelegramCommand>();
             var uploadCommand = commands.FirstOrDefault(c => c.CommandName == "/upload");
             if (uploadCommand != null)

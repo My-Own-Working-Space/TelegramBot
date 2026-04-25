@@ -1,0 +1,43 @@
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (14ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT COUNT(*) FROM "sqlite_master" WHERE "type" = 'table' AND "rootpage" IS NOT NULL;
+info: MyLinuxBot.Services.BotHostedService[0]
+      Starting Telegram bot service...
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:5000
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: /home/minhchau/Documents/TelegramBot-main/MyLinuxBot
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (7ms) [Parameters=[@__message_Chat_Id_0='?' (DbType = Int64), @__p_1='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "c"."Id", "c"."ChatId", "c"."Content", "c"."CreatedAt", "c"."Role"
+      FROM "ChatMessages" AS "c"
+      WHERE "c"."ChatId" = @__message_Chat_Id_0
+      ORDER BY "c"."Id" DESC
+      LIMIT @__p_1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (4ms) [Parameters=[@p0='?' (DbType = Int64), @p1='?' (Size = 21), @p2='?' (DbType = DateTime), @p3='?' (Size = 4)], CommandType='Text', CommandTimeout='30']
+      INSERT INTO "ChatMessages" ("ChatId", "Content", "CreatedAt", "Role")
+      VALUES (@p0, @p1, @p2, @p3)
+      RETURNING "Id";
+info: MyLinuxBot.Services.GeminiService[0]
+      CLI Agent responded: [HEALTH]
+info: MyLinuxBot.Services.AiToolboxService[0]
+      Toolbox fetching system health.
+info: MyLinuxBot.Services.GeminiService[0]
+      CLI Agent responded: Based on the health check:
+      
+      *   **Uptime**: The system has been running for 2 hours and 33 minutes.
+      *   **CPU**: Running at approximately **32.6%** load, with 67.4% idle capacity.
+      *   **Memory**: Using about **11.4 GB (50%)** of the 23.4 GB total RAM. There is 2.9 GB free and 9.0 GB being used for buffer/cache.
+      *   **Disk**: The main partition has **154 GB (69%) free** out of 233 GB.
+      
+      Overall, the system is healthy with plenty of available resources.
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@p0='?' (DbType = Int64), @p1='?' (Size = 454), @p2='?' (DbType = DateTime), @p3='?' (Size = 5)], CommandType='Text', CommandTimeout='30']
+      INSERT INTO "ChatMessages" ("ChatId", "Content", "CreatedAt", "Role")
+      VALUES (@p0, @p1, @p2, @p3)
+      RETURNING "Id";
