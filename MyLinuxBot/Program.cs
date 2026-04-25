@@ -34,7 +34,7 @@ builder.Services.AddHostedService<BotHostedService>();
 
 // 3. Register Domain Services
 builder.Services.AddSingleton<IShellService, ShellService>();
-builder.Services.AddHttpClient<IGeminiService, GeminiService>();
+builder.Services.AddSingleton<IGeminiService, GeminiService>();
 builder.Services.AddHttpClient<IN8nIntegrationService, N8nIntegrationService>();
 
 // 4. Register Commands (Command Pattern)
