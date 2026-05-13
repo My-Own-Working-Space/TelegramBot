@@ -1,0 +1,26 @@
+services:
+  mylinuxbot:
+    build:
+      context: .
+      network: host
+    container_name: mylinuxbot
+    restart: always
+    privileged: true
+    network_mode: host
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - ALLOWED_CHAT_ID=${ALLOWED_CHAT_ID}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - N8N_API_KEY=${N8N_API_KEY}
+      - DISPLAY=:0
+      - GEMINI_CLI_TRUST_WORKSPACE=true
+    volumes:
+      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /proc:/proc:ro
+      - /sys:/sys:ro
+      - /etc/os-release:/etc/os-release:ro
+      - ./MyLinuxBot.db:/app/MyLinuxBot.db
+      - ./.env:/app/.env
+    devices:
+      - /dev:/dev

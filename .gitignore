@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 node_modules/
 .env
 user_data/
@@ -15,3 +16,29 @@ user_data/
 *.userosscache
 *.sln.docstates
 *.db
+=======
+# .NET
+bin/
+obj/
+*.user
+*.userosscache
+*.sln.docstates
+
+# Databases
+*.db
+*.db-shm
+*.db-wal
+
+# Environment / Secrets
+.env
+*.txt.log
+bot_log.txt
+error_log.txt
+
+# Docker
+.dockerignore
+
+# OS
+.DS_Store
+Thumbs.db
+>>>>>>> b5b6487 (Initial commit: Autonomous AI Linux Agent (Refactored))
