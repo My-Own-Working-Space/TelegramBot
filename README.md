@@ -1,47 +1,58 @@
-# MyLinuxBot (Autonomous AI Agent Edition)
+# MyLinuxBot (Autonomous AI Agent)
 
-A high-performance, secure Linux System Orchestrator built with **.NET 9**. This bot transforms your Linux machine into an autonomous agent capable of reasoning, acting, and self-monitoring via Telegram.
+A high-performance Linux System Orchestrator built with .NET 9. This bot transforms your Linux machine into an autonomous agent capable of reasoning, job hunting, and secure system management via Telegram.
 
-## Key Features
+## Core Capabilities
 
-- **Autonomous AI Agent**: Integrated with Gemini CLI using a ReAct (Reasoning and Acting) logic. It can inspect CPU/RAM, read logs, and execute commands to solve your requests.
-- **Security-First Architecture**: 
-  - **Command Whitelist**: Only authorized binaries (ls, ps, df, etc.) are allowed to execute.
-  - **Path Traversal Protection**: Secure log reading restricted to `/var/log/`.
-  - **Shell Injection Guard**: Robust regex parsing and input sanitization.
-- **Economical Mode**: Optimized for Gemini Free Tier to minimize API quota usage (1 request per message).
-- **Remote Orchestration**: Manage system power (Reboot/Shutdown), take screenshots, and monitor processes from anywhere.
-- **Voice Interaction**: Integrated with Whisper for voice-to-command transcription.
+### 1. Natural Language Orchestration
+Powered by Groq AI (Llama 3.1 8B), the bot understands natural language requests. You can ask "How is my system?", "Any new jobs?", or "Take a screenshot" without remembering specific commands.
+
+### 2. Multi-Site Job Scanner
+Automated job discovery across premium platforms:
+- ITviec, TopCV, and VietnamWorks.
+- Intelligent filtering for Intern, Junior, and Fresher roles.
+- Automatic notifications for new matching opportunities.
+- SQLite-backed state tracking to prevent duplicate alerts.
+
+### 3. Hardened Security Framework
+Designed for secure homelab operation:
+- Command Whitelisting: Only pre-defined binaries and regex-validated arguments are allowed.
+- Path Isolation: Restrict file/log access to authorized directories only.
+- Output & Timeout Control: Enforced 64KB output truncation and 30s execution timeouts.
+- Loop Protection: AI agent reasoning is limited to 3 cycles per request to prevent cost/resource overrun.
 
 ## Technology Stack
 
-- **Core**: .NET 9 Worker Service & Minimal APIs
-- **AI**: Google Gemini CLI (Reasoning) & OpenAI Whisper (Voice)
-- **Execution**: CliWrap (Asynchronous shell execution)
-- **Containerization**: Docker & Docker Compose (Privileged mode for system access)
+- Framework: .NET 9 Worker Service
+- AI Engine: Groq API (Llama 3.1 8B Instant)
+- Browser Automation: Selenium WebDriver (Headless Chrome)
+- Execution: CliWrap (Execv-style safe execution)
+- Database: SQLite (Entity Framework Core)
+- Containerization: Docker & Docker Compose
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `/ask <prompt>` | Interact with the AI Agent to manage your system. |
-| `/stats` | Quick summary of CPU, RAM, Disk, and Temperature. |
-| `/top` | Lists top 10 processes by CPU usage. |
-| `/power` | Interactive menu for Reboot, Shutdown, or Sleep. |
-| `/screen` | Captures and sends a screenshot of the host's primary display. |
+- /scan: Immediate trigger for multi-site job scanning.
+- /stats: Real-time system health summary (CPU, RAM, Disk).
+- /screen: Captures and sends a host display screenshot.
+- /power: System power management (Reboot/Shutdown).
+- /shell <cmd>: Securely execute whitelisted system commands.
 
-## Configuration
+## Setup & Deployment
 
-Create a `.env` file in the root directory:
+1. Configure your environment in .env:
+   ```env
+   TELEGRAM_BOT_TOKEN=your_token
+   ALLOWED_CHAT_ID=your_id
+   GROQ_API_KEY=your_groq_key
+   ```
 
-```env
-TELEGRAM_BOT_TOKEN=your_bot_token
-ALLOWED_CHAT_ID=your_chat_id
-GEMINI_API_KEY=your_google_ai_key
-```
+2. Customize security policies in security_config.json.
 
-## Deployment
+3. Deploy using Docker Compose:
+   ```bash
+   docker compose up -d --build
+   ```
 
-```bash
-docker compose up -d --build
-```
+## Security Auditing
+The system logs all execution attempts, blocked commands, and AI tool calls for auditing purposes. Unit and security tests are located in the MyLinuxBot.Tests project.
