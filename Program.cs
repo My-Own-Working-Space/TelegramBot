@@ -6,6 +6,8 @@ using MyLinuxBot.Data;
 using MyLinuxBot.Interfaces;
 using MyLinuxBot.Services;
 using MyLinuxBot.Commands;
+using MyLinuxBot.Workers;
+using MyLinuxBot.Handlers;
 
 // Load environment variables from .env file
 Env.Load();
@@ -35,7 +37,9 @@ builder.Services.AddHostedService<BotHostedService>();
 // 3. Register Domain Services
 builder.Services.AddSingleton<IShellService, ShellService>();
 builder.Services.AddSingleton<IAiToolboxService, AiToolboxService>();
-builder.Services.AddSingleton<IGeminiService, GeminiService>();
+builder.Services.AddHttpClient<IGeminiService, GeminiService>();
+builder.Services.AddScoped<IJobScannerService, JobScannerService>();
+builder.Services.AddHostedService<JobScannerWorker>();
 builder.Services.AddHttpClient<IN8nIntegrationService, N8nIntegrationService>();
 builder.Services.AddHttpClient<IWhisperService, WhisperService>(client =>
 {
@@ -51,6 +55,7 @@ builder.Services.AddTransient<ITelegramCommand, StatsCommand>();
 builder.Services.AddTransient<ITelegramCommand, PowerCommand>();
 builder.Services.AddTransient<ITelegramCommand, ProcessCommand>();
 builder.Services.AddTransient<ITelegramCommand, ScreenCommand>();
+builder.Services.AddTransient<ITelegramCommand, ScanCommand>();
 
 var app = builder.Build();
 

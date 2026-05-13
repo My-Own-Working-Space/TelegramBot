@@ -11,6 +11,7 @@ services:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - ALLOWED_CHAT_ID=${ALLOWED_CHAT_ID}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
       - N8N_API_KEY=${N8N_API_KEY}
       - DISPLAY=:0
       - GEMINI_CLI_TRUST_WORKSPACE=true
@@ -22,5 +23,6 @@ services:
       - /etc/os-release:/etc/os-release:ro
       - ./MyLinuxBot.db:/app/MyLinuxBot.db
       - ./.env:/app/.env
+      - /var/run/docker.sock:/var/run/docker.sock
     devices:
       - /dev:/dev

@@ -1,76 +1,87 @@
 using MyLinuxBot.Interfaces;
+using MyLinuxBot.Models;
+using System.Text.Json;
 
 namespace MyLinuxBot.Services;
 
-public class AiToolboxService(IShellService shellService, ILogger<AiToolboxService> logger) : IAiToolboxService
+public class AiToolboxService : IAiToolboxService
 {
-    private static readonly string[] AllowedLogDirectories = { "/var/log/" };
+    private readonly IShellService _shellService;
+    private readonly ILogger<AiToolboxService> _logger;
+    private readonly SecurityConfig _securityConfig;
 
-    public async Task<string> ExecuteSafeCommandAsync(string command, CancellationToken cancellationToken = default)
+    public AiToolboxService(IShellService shellService, ILogger<AiToolboxService> logger)
     {
-        // Security is now centralized in ShellService via Whitelist
-        return await shellService.ExecuteCommandAsync(command, cancellationToken: cancellationToken);
-    }
-
-    public async Task<string> GetSystemHealthAsync(CancellationToken cancellationToken = default)
-    {
-        logger.LogInformation("Toolbox fetching system health.");
-        try
+        _shellService = shellService;
+        _logger = logger;
+        
+        try 
         {
-            var cpuRamTask = shellService.ExecuteCommandAsync("top -bn1 | grep 'Cpu(s)\\|MiB Mem'", cancellationToken: cancellationToken);
-            var diskTask = shellService.ExecuteCommandAsync("df -h /", cancellationToken: cancellationToken);
-            var uptimeTask = shellService.ExecuteCommandAsync("uptime -p", cancellationToken: cancellationToken);
+            var configPath = Path.Combine(AppContext.BaseDirectory, "security_config.json");
+            if (!File.Exists(configPath)) configPath = "security_config.json";
             
-            await Task.WhenAll(cpuRamTask, diskTask, uptimeTask);
-            
-            return $"==== SYSTEM HEALTH ====\nUptime: {await uptimeTask}\nCPU/RAM:\n{await cpuRamTask}\nDisk:\n{await diskTask}";
+            var json = File.ReadAllText(configPath);
+            _securityConfig = JsonSerializer.Deserialize<SecurityConfig>(json) ?? new SecurityConfig();
         }
-        catch (Exception ex)
+        catch 
         {
-            return $"Failed to get system health: {ex.Message}";
+            _securityConfig = new SecurityConfig();
         }
     }
 
-    public async Task<string> ReadLogSummaryAsync(string logFilePath, int lines = 100, CancellationToken cancellationToken = default)
+    public async Task<string> ExecuteSafeCommandAsync(string command, CancellationToken ct)
     {
-        lines = Math.Clamp(lines, 1, 1000);
-        logger.LogInformation("Toolbox reading log file: {FilePath}", logFilePath);
-
-        if (!IsLogPathAllowed(logFilePath))
-        {
-            logger.LogWarning("Blocked unauthorized log path access: {Path}", logFilePath);
-            return "Error: Log path is not permitted.";
-        }
-
-        try
-        {
-            var command = $"tail -n {lines} '{logFilePath}' | grep -iE 'error|warn|fail|exception' | tail -n 20";
-            var result = await shellService.ExecuteCommandAsync(command, cancellationToken: cancellationToken);
-            
-            if (string.IsNullOrWhiteSpace(result))
-            {
-                return $"No recent issues found in {logFilePath}.";
-            }
-            
-            return $"==== Log Issues from {logFilePath} ====\n{result}";
-        }
-        catch (Exception ex)
-        {
-            return $"Failed to read log summary: {ex.Message}";
-        }
+        return await _shellService.ExecuteCommandAsync(command, cancellationToken: ct);
     }
 
-    private bool IsLogPathAllowed(string path)
+    public async Task<string> GetSystemHealthAsync(CancellationToken ct)
     {
-        try
+        var df = await _shellService.ExecuteCommandAsync("df -h /", cancellationToken: ct);
+        var free = await _shellService.ExecuteCommandAsync("free -h", cancellationToken: ct);
+        var uptime = await _shellService.ExecuteCommandAsync("uptime -p", cancellationToken: ct);
+        
+        return $"System Health:\n\nDisk:\n{df}\n\nMemory:\n{free}\n\nUptime: {uptime}";
+    }
+
+    public async Task<string> ReadLogSummaryAsync(string path, int lines, CancellationToken ct)
+    {
+        if (lines < 1) lines = 10;
+        if (lines > 1000) lines = 1000;
+
+        try 
         {
             var fullPath = Path.GetFullPath(path);
-            return AllowedLogDirectories.Any(dir => fullPath.StartsWith(dir, StringComparison.OrdinalIgnoreCase))
-                   && !fullPath.Contains("..");
+            
+            bool isAllowed = _securityConfig.AllowedReadDirectories.Any(dir => 
+                fullPath.StartsWith(Path.GetFullPath(dir), StringComparison.OrdinalIgnoreCase));
+
+            if (!isAllowed)
+            {
+                _logger.LogWarning("SEC-LOG-01: Blocked unauthorized log access to {Path}", path);
+                return $"Security Error: Access to directory '{Path.GetDirectoryName(fullPath)}' is not allowed.";
+            }
+
+            return await _shellService.ExecuteCommandAsync($"tail -n {lines} {fullPath}", cancellationToken: ct);
         }
-        catch
+        catch (Exception ex)
         {
-            return false;
+            return $"Error: {ex.Message}";
         }
+    }
+
+    public async Task<string> ControlServiceAsync(string serviceName, string action, CancellationToken ct)
+    {
+        if (!_securityConfig.ServiceWhitelist.Contains(serviceName.ToLower()))
+        {
+            return $"Security Error: Service '{serviceName}' is not in the whitelist.";
+        }
+
+        string[] allowedActions = { "status", "start", "stop", "restart" };
+        if (!allowedActions.Contains(action.ToLower()))
+        {
+            return $"Error: Action '{action}' is not supported.";
+        }
+
+        return await _shellService.ExecuteCommandAsync($"systemctl {action} {serviceName}", cancellationToken: ct);
     }
 }

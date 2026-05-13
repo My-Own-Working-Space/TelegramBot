@@ -2,14 +2,30 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using System.Net.Http.Headers;
 using MyLinuxBot.Interfaces;
 using MyLinuxBot.Models;
 
 namespace MyLinuxBot.Services;
 
-public partial class GeminiService(IShellService shellService, IAiToolboxService toolboxService, ILogger<GeminiService> logger) : IGeminiService
+public class GeminiService(
+    HttpClient httpClient, 
+    IShellService shellService, 
+    IAiToolboxService toolboxService, 
+    IConfiguration config,
+    ILogger<GeminiService> logger) : IGeminiService
 {
-    private static readonly Regex ToolCallRegex = new(@"\[(?<type>EXEC|LOGS|HEALTH)(?::\s*(?<content>.*?))?\]", RegexOptions.IgnoreCase);
+    private static readonly Regex ToolCallRegex = new(@"^\[(?<type>EXEC|LOGS|HEALTH|SCAN|SCREEN|STATS|PS|POWER)(?::\s*(?<content>[^\]]{1,500}))?\]$", RegexOptions.IgnoreCase | RegexOptions.Multiline);
+    private readonly string _apiKey = config["GROQ_API_KEY"] ?? "";
+    private readonly SecurityConfig _securityConfig = LoadSecurityConfig();
+
+    private static SecurityConfig LoadSecurityConfig()
+    {
+        try {
+            var json = File.ReadAllText("security_config.json");
+            return JsonSerializer.Deserialize<SecurityConfig>(json) ?? new SecurityConfig();
+        } catch { return new SecurityConfig(); }
+    }
 
     public async Task<string> AskAsync(string prompt, CancellationToken cancellationToken = default)
     {
@@ -18,60 +34,77 @@ public partial class GeminiService(IShellService shellService, IAiToolboxService
     
     public async Task<string> AskWithHistoryAsync(IEnumerable<ChatMessage> history, string currentPrompt, CancellationToken cancellationToken = default)
     {
-        var sb = new StringBuilder();
-        sb.AppendLine("SYSTEM: You are Minh Chau Controller, a Linux Autonomous Agent.");
-        sb.AppendLine("You MUST use your tools if asked to inspect the system, run commands, or check logs.");
-        sb.AppendLine("To use a tool, reply EXACTLY with one of the following tags:");
-        sb.AppendLine("[EXEC: <command>] - runs a bash command");
-        sb.AppendLine("[HEALTH] - gets CPU/RAM/Disk health");
-        sb.AppendLine("[LOGS: <file_path>] - summarizes error logs");
-        sb.AppendLine("If you don't need a tool, just answer the user normally.");
-        sb.AppendLine("--- CHAT HISTORY ---");
-        
-        foreach (var msg in history)
+        int loopCount = 0;
+        var currentHistory = history.ToList();
+
+        while (loopCount < _securityConfig.MaxLoops)
         {
-            sb.AppendLine($"{msg.Role}: {msg.Content}");
-        }
-        sb.AppendLine($"user: {currentPrompt}");
+            loopCount++;
+            var response = await CallGroqApiAsync(currentHistory, currentPrompt, cancellationToken);
+            
+            if (string.IsNullOrWhiteSpace(response)) return "AI returned an empty response.";
 
-        string fullPrompt = sb.ToString();
-        string tempFile = Path.Combine(Path.GetTempPath(), $"gemini_prompt_{Guid.NewGuid():N}.txt");
-        await File.WriteAllTextAsync(tempFile, fullPrompt, cancellationToken);
-
-        try
-        {
-            var command = $"cat '{tempFile}' | gemini";
-            var agentResponse = await shellService.ExecuteCommandAsync(command, timeout: TimeSpan.FromSeconds(120), cancellationToken: cancellationToken);
-            agentResponse = agentResponse.Trim();
-
-            logger.LogInformation("Agent responded: {Response}", agentResponse);
-
-            var match = ToolCallRegex.Match(agentResponse);
+            var match = ToolCallRegex.Match(response);
             if (match.Success)
             {
                 var toolType = match.Groups["type"].Value.ToUpperInvariant();
                 var content = match.Groups["content"].Value.Trim();
                 
-                return toolType switch
+                logger.LogInformation("AI requested tool: {Type} (Loop {Loop})", toolType, loopCount);
+
+                var toolResult = toolType switch
                 {
-                    "EXEC" => await toolboxService.ExecuteSafeCommandAsync(content, cancellationToken),
+                    "SCAN" => await toolboxService.ExecuteSafeCommandAsync("echo 'Scanning jobs...'", cancellationToken).ContinueWith(_ => "Scan tool triggered."), 
+                    "STATS" => await toolboxService.GetSystemHealthAsync(cancellationToken),
                     "HEALTH" => await toolboxService.GetSystemHealthAsync(cancellationToken),
-                    "LOGS" => await toolboxService.ReadLogSummaryAsync(content, 100, cancellationToken),
-                    _ => "Unknown tool type."
+                    "SCREEN" => await shellService.ExecuteCommandAsync("scrot /tmp/screen.png && echo 'Screenshot taken.'", cancellationToken: cancellationToken),
+                    "PS" => await shellService.ExecuteCommandAsync("ps aux", cancellationToken: cancellationToken),
+                    "EXEC" => await toolboxService.ExecuteSafeCommandAsync(content, cancellationToken),
+                    "LOGS" => await toolboxService.ReadLogSummaryAsync(content, 50, cancellationToken),
+                    _ => "Unknown or restricted tool."
                 };
+
+                return toolResult; 
             }
 
-            return string.IsNullOrWhiteSpace(agentResponse) ? "Agent returned empty response." : agentResponse;
+            return response;
         }
-        catch (Exception ex)
+
+        return "AI Agent exceeded maximum reasoning loops.";
+    }
+
+    private async Task<string> CallGroqApiAsync(IEnumerable<ChatMessage> history, string prompt, CancellationToken ct)
+    {
+        var messages = new List<object>
         {
-            logger.LogError(ex, "Error calling Gemini CLI");
-            return $"Error: {ex.Message}";
-        }
-        finally
+            new { role = "system", content = "You are Minh Chau Controller, a minimalist Linux Autonomous Agent. " +
+                                            "Rules: NO emojis. Professional. Use tool tags ONLY when necessary.\n" +
+                                            "- [STATS]: System health.\n" +
+                                            "- [SCAN]: Job search.\n" +
+                                            "- [SCREEN]: Screenshot.\n" +
+                                            "- [EXEC: <cmd>]: Bash command (must be in whitelist).\n" +
+                                            "- [LOGS: <path>]: Read logs." }
+        };
+
+        foreach (var msg in history)
+            messages.Add(new { role = msg.Role == "user" ? "user" : "assistant", content = msg.Content });
+        
+        messages.Add(new { role = "user", content = prompt });
+
+        var requestBody = new { model = "llama-3.1-8b-instant", messages = messages, temperature = 0.1 };
+
+        try
         {
-            if (File.Exists(tempFile)) 
-                File.Delete(tempFile);
+            var request = new HttpRequestMessage(HttpMethod.Post, "https://api.groq.com/openai/v1/chat/completions");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+            request.Content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
+
+            var response = await httpClient.SendAsync(request, ct);
+            if (!response.IsSuccessStatusCode) return $"Groq API Error: {response.StatusCode}";
+
+            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+            return doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString()?.Trim() ?? "";
         }
+        catch (Exception ex) { return $"AI Call Error: {ex.Message}"; }
     }
 }

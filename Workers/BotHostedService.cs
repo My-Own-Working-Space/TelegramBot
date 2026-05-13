@@ -1,7 +1,7 @@
 using Telegram.Bot;
 using Telegram.Bot.Polling;
 
-namespace MyLinuxBot.Services;
+namespace MyLinuxBot.Workers;
 
 public class BotHostedService(
     ILogger<BotHostedService> logger, 

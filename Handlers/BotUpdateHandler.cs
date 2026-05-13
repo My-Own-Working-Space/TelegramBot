@@ -9,7 +9,7 @@ using MyLinuxBot.Models;
 using Microsoft.EntityFrameworkCore;
 using Telegram.Bot.Types.ReplyMarkups;
 
-namespace MyLinuxBot.Services;
+namespace MyLinuxBot.Handlers;
 
 public class BotUpdateHandler(
     ILogger<BotUpdateHandler> logger, 
@@ -106,10 +106,24 @@ public class BotUpdateHandler(
             dbContext.ChatMessages.Add(modelMsg);
             await dbContext.SaveChangesAsync(cancellationToken);
             
+            if (string.IsNullOrWhiteSpace(response))
+                response = "AI Agent did not return a response or an error occurred.";
+
             if (response.Length > 4000)
                 response = response[..4000] + "\n...[truncated]";
                 
             await botClient.EditMessageText(message.Chat.Id, typingMsg.MessageId, response, parseMode: ParseMode.None, cancellationToken: cancellationToken);
+
+            // Gửi ảnh nếu AI chụp màn hình
+            if (response.Contains("Screenshot taken", StringComparison.OrdinalIgnoreCase))
+            {
+                var screenPath = "/tmp/screen.png";
+                if (System.IO.File.Exists(screenPath))
+                {
+                    using var stream = System.IO.File.OpenRead(screenPath);
+                    await botClient.SendPhoto(message.Chat.Id, InputFile.FromStream(stream), cancellationToken: cancellationToken);
+                }
+            }
         }
         else if (message.Type == MessageType.Document)
         {
@@ -170,8 +184,19 @@ public class BotUpdateHandler(
                 
                 var finalMsg = $"{transcribedText}\n\n{response}";
                 if (finalMsg.Length > 4000) finalMsg = finalMsg[..4000] + "\n...[truncated]";
-                
+
                 await botClient.EditMessageText(message.Chat.Id, typingMsg.MessageId, finalMsg, cancellationToken: cancellationToken);
+
+                // Gửi ảnh nếu AI chụp màn hình qua lệnh giọng nói
+                if (response.Contains("Screenshot taken", StringComparison.OrdinalIgnoreCase))
+                {
+                    var screenPath = "/tmp/screen.png";
+                    if (System.IO.File.Exists(screenPath))
+                    {
+                        using var stream = System.IO.File.OpenRead(screenPath);
+                        await botClient.SendPhoto(message.Chat.Id, InputFile.FromStream(stream), cancellationToken: cancellationToken);
+                    }
+                }
             }
             catch (Exception ex)
             {

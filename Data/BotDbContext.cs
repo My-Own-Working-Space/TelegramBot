@@ -5,8 +5,9 @@ namespace MyLinuxBot.Data;
 
 public class BotDbContext(DbContextOptions<BotDbContext> options) : DbContext(options)
 {
-    public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
-    public DbSet<StoryState> StoryStates => Set<StoryState>();
+    public DbSet<ChatMessage> ChatMessages { get; set; }
+    public DbSet<StoryState> StoryStates { get; set; }
+    public DbSet<ScannedJob> ScannedJobs { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -1,0 +1,30 @@
+{
+  "CommandWhitelist": [
+    { "Binary": "df", "AllowedArgs": "^-h(\\s+\\/[\\w/]*)?$", "Description": "Check disk space" },
+    { "Binary": "free", "AllowedArgs": "^-h$", "Description": "Check memory usage" },
+    { "Binary": "uptime", "AllowedArgs": "^(-p)?$", "Description": "Check system uptime" },
+    { "Binary": "ps", "AllowedArgs": "^aux(\\s+--sort=-%cpu)?(\\s+\\|\\s+head\\s+-n\\s+\\d+)?$", "Description": "List processes" },
+    { "Binary": "ls", "AllowedArgs": "^-lh(\\s+[\\w./-]+)?$", "Description": "List files" },
+    { "Binary": "docker", "AllowedArgs": "^(ps|images|stats|logs|inspect|compose|port|top|network|volume)(\\s+[\\w.-]+)*$", "Description": "Docker management" },
+    { "Binary": "systemctl", "AllowedArgs": "^(status|start|stop|restart)\\s+[\\w.-]+$", "Description": "Service management" }
+  ],
+  "ServiceWhitelist": [
+    "nginx",
+    "docker",
+    "mylinuxbot",
+    "postgresql",
+    "ssh"
+  ],
+  "AllowedReadDirectories": [
+    "/var/log/",
+    "/app/logs/",
+    "/home/minhchau/Documents/TelegramBot-main/"
+  ],
+  "AllowedWriteDirectories": [
+    "/home/minhchau/Documents/TelegramBot-main/workspace/",
+    "/tmp/"
+  ],
+  "MaxOutputSize": 65536,
+  "DefaultTimeoutSeconds": 30,
+  "MaxLoops": 3
+}
